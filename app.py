@@ -11,7 +11,9 @@ OUTPUT_FOLDER = "static/downloads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 
+# ✅ Updated to ensure folder exists before clearing
 def clear_folder(path):
+    os.makedirs(path, exist_ok=True)
     for file in os.listdir(path):
         os.remove(os.path.join(path, file))
 
