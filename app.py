@@ -11,7 +11,7 @@ OUTPUT_FOLDER = "static/downloads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 
-# ✅ Updated to ensure folder exists before clearing
+# ✅ Ensure folder exists before clearing
 def clear_folder(path):
     os.makedirs(path, exist_ok=True)
     for file in os.listdir(path):
@@ -21,6 +21,10 @@ def clear_folder(path):
 def index():
     clips = []
     if request.method == "POST":
+        # ✅ Check if video file is actually uploaded
+        if "video" not in request.files or request.files["video"].filename == "":
+            return "No video file uploaded", 400
+
         clear_folder(UPLOAD_FOLDER)
         clear_folder(OUTPUT_FOLDER)
 
