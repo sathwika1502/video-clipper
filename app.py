@@ -1,10 +1,10 @@
 import logging
 logging.basicConfig(level=logging.DEBUG)
-from flask import Flask, render_template, request, send_from_directory, redirect, url_for
+
+from flask import Flask, render_template, request, send_from_directory
 import os
 from werkzeug.utils import secure_filename
 import zipfile
-from datetime import datetime
 import subprocess
 
 app = Flask(__name__)
@@ -13,7 +13,6 @@ OUTPUT_FOLDER = "static/downloads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 
-# ✅ Ensure folder exists before clearing
 def clear_folder(path):
     os.makedirs(path, exist_ok=True)
     for file in os.listdir(path):
@@ -23,7 +22,6 @@ def clear_folder(path):
 def index():
     clips = []
     if request.method == "POST":
-        # ✅ Check if video file is actually uploaded
         if "video" not in request.files or request.files["video"].filename == "":
             return "No video file uploaded", 400
 
@@ -60,8 +58,8 @@ def index():
                 out_path
             ]
             result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-print("FFmpeg Output:", result.stdout.decode())
-print("FFmpeg Error:", result.stderr.decode())
+            print("FFmpeg Output:", result.stdout.decode())
+            print("FFmpeg Error:", result.stderr.decode())
             clips.append(out_name)
 
         # Create ZIP
@@ -82,9 +80,5 @@ def download_clip(filename):
 if __name__ == "__main__":
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    app.run(debug=True)
-if __name__ == "__main__":
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    port = int(os.environ.get("PORT", 5000))  # Use Render's port
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
