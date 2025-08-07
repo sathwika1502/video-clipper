@@ -1,8 +1,4 @@
 services:
   - type: web
     name: video-clipper
-    env: python
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    env: docker

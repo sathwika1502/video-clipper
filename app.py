@@ -1,3 +1,5 @@
+import logging
+logging.basicConfig(level=logging.DEBUG)
 from flask import Flask, render_template, request, send_from_directory, redirect, url_for
 import os
 from werkzeug.utils import secure_filename
@@ -57,8 +59,9 @@ def index():
                 "-c:a", "aac",
                 out_path
             ]
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+print("FFmpeg Output:", result.stdout.decode())
+print("FFmpeg Error:", result.stderr.decode())
             clips.append(out_name)
 
         # Create ZIP
