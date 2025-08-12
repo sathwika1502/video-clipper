@@ -1,84 +1,74 @@
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-from flask import Flask, render_template, request, send_from_directory
 import os
-from werkzeug.utils import secure_filename
-import zipfile
 import subprocess
+from flask import Flask, request, render_template, send_file
 
 app = Flask(__name__)
-UPLOAD_FOLDER = "uploads"
-OUTPUT_FOLDER = "static/downloads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 
-def clear_folder(path):
-    os.makedirs(path, exist_ok=True)
-    for file in os.listdir(path):
-        os.remove(os.path.join(path, file))
+UPLOAD_FOLDER = "uploads"
+CLIPS_FOLDER = "clips"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(CLIPS_FOLDER, exist_ok=True)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    clips = []
     if request.method == "POST":
-        if "video" not in request.files or request.files["video"].filename == "":
-            return "No video file uploaded", 400
-
-        clear_folder(UPLOAD_FOLDER)
-        clear_folder(OUTPUT_FOLDER)
-
         video = request.files["video"]
-        filename = secure_filename(video.filename)
-        video_path = os.path.join(UPLOAD_FOLDER, filename)
+        start_time = request.form.get("start")
+        end_time = request.form.get("end")
+
+        if not video or not start_time or not end_time:
+            return "Missing required inputs", 400
+
+        video_path = os.path.join(UPLOAD_FOLDER, video.filename)
         video.save(video_path)
 
-        starts = request.form.getlist("start")
-        ends = request.form.getlist("end")
+        start_sec = time_to_seconds(start_time)
+        end_sec = time_to_seconds(end_time)
+        out_filename = f"clip_{video.filename}"
+        out_path = os.path.join(CLIPS_FOLDER, out_filename)
 
-        for i, (start, end) in enumerate(zip(starts, ends)):
-            try:
-                h1, m1, s1 = map(int, start.strip().split(":"))
-                h2, m2, s2 = map(int, end.strip().split(":"))
-                start_sec = h1 * 3600 + m1 * 60 + s1
-                end_sec = h2 * 3600 + m2 * 60 + s2
-            except:
-                continue
+        # Build ffmpeg command
+        cmd = [
+            "ffmpeg",
+            "-ss", str(start_sec),                # fast seek
+            "-i", video_path,                     # input file
+            "-to", str(end_sec - start_sec),      # clip duration
+            "-c", "copy",                         # avoid re-encoding
+            "-y",                                 # overwrite without asking
+            out_path
+        ]
 
-            out_name = f"clip_{i+1}.mp4"
-            out_path = os.path.join(OUTPUT_FOLDER, out_name)
+        print("\n=== Running ffmpeg command ===")
+        print(" ".join(cmd))
 
-            cmd = [
-                "ffmpeg",
-                "-ss", str(start_sec),
-                "-to", str(end_sec),
-                "-i", video_path,
-                "-c:v", "libx264",
-                "-c:a", "aac",
-                out_path
-            ]
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            print("FFmpeg Output:", result.stdout.decode())
-            print("FFmpeg Error:", result.stderr.decode())
-            clips.append(out_name)
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True
+            )
 
-        # Create ZIP
-        zip_path = os.path.join(OUTPUT_FOLDER, "all_clips.zip")
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
-            for clip in clips:
-                clip_path = os.path.join(OUTPUT_FOLDER, clip)
-                zipf.write(clip_path, arcname=clip)
+            print("\n=== FFMPEG STDOUT ===")
+            print(result.stdout)
+            print("\n=== FFMPEG STDERR ===")
+            print(result.stderr)
 
-        return render_template("index.html", clips=clips, zip_file="all_clips.zip")
+            if result.returncode != 0:
+                print(f"FFmpeg failed with code {result.returncode}")
+                return f"Error: FFmpeg failed. See logs.", 500
 
-    return render_template("index.html", clips=[], zip_file=None)
+        except Exception as e:
+            print(f"Exception running ffmpeg: {e}")
+            return f"Error running ffmpeg: {e}", 500
 
-@app.route("/download/<filename>")
-def download_clip(filename):
-    return send_from_directory(app.config["OUTPUT_FOLDER"], filename, as_attachment=True)
+        return send_file(out_path, as_attachment=True)
+
+    return render_template("index.html")
+
+def time_to_seconds(t):
+    parts = list(map(int, t.split(":")))
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
 
 if __name__ == "__main__":
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
