@@ -1,4 +1,10 @@
 services:
   - type: web
     name: video-clipper
-    env: docker
+    env: python
+    plan: free
+    buildCommand: ./render-build.sh && pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PORT
+        value: 5000
